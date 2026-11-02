@@ -1,0 +1,36 @@
+# Two networks:
+#   edge    - normal bridge network, the only one with a published port.
+#   private - "internal: true": no route to the host or the internet.
+# httpbin is attached only to "private", so the gateway is the single way in.
+
+services:
+  httpbin:
+    image: ghcr.io/mccutchen/go-httpbin:latest
+    environment:
+      PORT: "8081"
+    networks:
+      - private
+    restart: unless-stopped
+
+  gateway:
+    build: ./gateway
+    environment:
+      JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in .env}
+      JWT_TTL_SECONDS: ${JWT_TTL_SECONDS:-900}
+      UPSTREAM_URL: http://httpbin:8081
+      USERS_FILE: /app/users.json
+    volumes:
+      - ./users.json:/app/users.json:ro
+    ports:
+      - "80:8080"
+    networks:
+      - edge
+      - private
+    depends_on:
+      - httpbin
+    restart: unless-stopped
+
+networks:
+  edge:
+  private:
+    internal: true
